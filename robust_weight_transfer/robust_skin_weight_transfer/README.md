@@ -32,6 +32,13 @@ cmake --build build-host
 ```
 The same tests run in the guest through the `run_tests` and `run_property_tests` calls, each inside the default instruction cap. The guest uses a shorter ladder of trials than the host. The weight arrays the guest returns are column-major: all vertices for bone 0, then bone 1, and so on.
 
+## Checking the built guest
+`tests/run_guest.gd` loads the ELF into a Sandbox in a headless double Godot editor with the godot_sandbox addon and runs the guest's tests and its entry points on a known case:
+```sh
+godot --headless --path <project with the addon> -s <path to>/tests/run_guest.gd -- <robust_weight_transfer.elf>
+```
+It ends with `RESULT: PASS` or `RESULT: FAIL`.
+
 ## Body to garment transfer
 `create_cage` builds a cage around a garment mesh, and `robust_weight_transfer` moves the skin weights of
 a body onto it.
