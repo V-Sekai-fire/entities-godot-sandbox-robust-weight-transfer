@@ -24,6 +24,7 @@ add_sandbox_program_at(robust_weight_transfer ${PROOT}
 target_include_directories(robust_weight_transfer SYSTEM PRIVATE 
 ${CMAKE_SOURCE_DIR}/thirdparty/eigen 
 ${CMAKE_SOURCE_DIR}/thirdparty/libigl/include 
+${CMAKE_SOURCE_DIR}/thirdparty/witness-cpp/include 
 ${CMAKE_SOURCE_DIR}/thirdparty/nonmanifold-laplacian/include 
 ${CMAKE_SOURCE_DIR}/thirdparty/nonmanifold-laplacian/include 
 ${CMAKE_SOURCE_DIR}/thirdparty/geometry_central/include)
