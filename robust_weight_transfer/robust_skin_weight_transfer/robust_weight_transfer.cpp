@@ -13,6 +13,11 @@
 #include <igl/point_mesh_squared_distance.h>
 #include <igl/barycentric_coordinates.h>
 #include <igl/cotmatrix.h>
+#include <memory>
+#include <geometrycentral/surface/halfedge_factories.h>
+#include <geometrycentral/surface/surface_mesh.h>
+#include <geometrycentral/surface/tufted_laplacian.h>
+#include <geometrycentral/surface/vertex_position_geometry.h>
 #include <igl/massmatrix.h>
 #include <igl/adjacency_list.h>
 #include <igl/invert_diag.h>
@@ -150,15 +155,33 @@ bool is_valid_array(const Eigen::MatrixXd& p_matrix) {
  *  W_inpainted: #V2 by num_bones, final skinning weights where we inpainted weights for all vertices i where Matched[i] == False
  *  success: true if inpainting succeeded, false otherwise
  */
-bool inpaint(const Eigen::MatrixXd& p_V2, const Eigen::MatrixXi& p_F2, const Eigen::MatrixXd& p_W2, const Eigen::Array<bool,Eigen::Dynamic,1>& p_Matched, Eigen::MatrixXd& r_W_inpainted)
+// geometry-central's default relativeFactor for intrinsic mollification.
+constexpr double DEFAULT_MOLLIFY_FACTOR = 1e-6;
+
+bool inpaint(const Eigen::MatrixXd& p_V2, const Eigen::MatrixXi& p_F2, const Eigen::MatrixXd& p_W2, const Eigen::Array<bool,Eigen::Dynamic,1>& p_Matched, Eigen::MatrixXd& r_W_inpainted, double p_mollify_factor)
 {
-    // Compute the laplacian
-    Eigen::SparseMatrix<double> L, M, Minv;
-    igl::cotmatrix(p_V2, p_F2, L);
-    igl::massmatrix(p_V2, p_F2, igl::MASSMATRIX_TYPE_VORONOI, M);
+    // Tufted Laplacian with intrinsic mollification (Sharp and Crane 2020), as robust_laplacian.mesh_laplacian.
+    // geometry-central's L is positive semidefinite, igl::cotmatrix's is negative semidefinite.
+    std::vector<std::vector<size_t>> polygons(p_F2.rows());
+    for (int i = 0; i < p_F2.rows(); ++i) {
+        polygons[i] = { size_t(p_F2(i, 0)), size_t(p_F2(i, 1)), size_t(p_F2(i, 2)) };
+    }
+    std::vector<geometrycentral::Vector3> positions(p_V2.rows());
+    for (int i = 0; i < p_V2.rows(); ++i) {
+        positions[i] = geometrycentral::Vector3{ p_V2(i, 0), p_V2(i, 1), p_V2(i, 2) };
+    }
+    std::unique_ptr<geometrycentral::surface::SurfaceMesh> tufted_mesh;
+    std::unique_ptr<geometrycentral::surface::VertexPositionGeometry> tufted_geometry;
+    std::tie(tufted_mesh, tufted_geometry) = geometrycentral::surface::makeGeneralHalfedgeAndGeometry(polygons, positions);
+    Eigen::SparseMatrix<double> L_pos, M, Minv;
+    std::tie(L_pos, M) = geometrycentral::surface::buildTuftedLaplacian(*tufted_mesh, *tufted_geometry, p_mollify_factor);
+    if (L_pos.rows() != p_V2.rows()) {
+        std::cerr << "tufted Laplacian has " << L_pos.rows() << " rows for " << p_V2.rows() << " vertices" << std::endl;
+        return false;
+    }
+    Eigen::SparseMatrix<double> L = -L_pos;
     igl::invert_diag(M, Minv);
 
-    // L, M = robust_laplacian.mesh_laplacian(V2, F2)
     Eigen::SparseMatrix<double> Q = -L + L * Minv * L;
     Eigen::SparseMatrix<double> Aeq;
     Eigen::VectorXd Beq;
@@ -431,7 +454,7 @@ bool test_inpaint() {
 
     Eigen::MatrixXd W_inpainted(4, 2);
     
-    bool success = inpaint(V2, F2, W2, Matched, W_inpainted);
+    bool success = inpaint(V2, F2, W2, Matched, W_inpainted, DEFAULT_MOLLIFY_FACTOR);
     std::cout << "Inpainted Weights:\n" << W_inpainted << std::endl;
     std::cout << "Expected Inpainted Weights:\n" << expected_W_inpainted << std::endl;
     if (success != true || !W_inpainted.isApprox(expected_W_inpainted, 1e-6)) {
@@ -589,6 +612,7 @@ extern "C" Variant robust_weight_transfer(Mesh source_mesh, Mesh target_mesh, Di
     double distance_threshold = arguments["distance_threshold"].value();
     int64_t source_mesh_surface = arguments["source_mesh_surface"].value();
     int64_t target_mesh_surface = arguments["target_mesh_surface"].value();
+    double mollify_factor = arguments.has("mollify_factor") ? double(arguments["mollify_factor"].value()) : DEFAULT_MOLLIFY_FACTOR;
 
     if (verbose) { std::cout << "arguments:\n" << std::endl; }
 
@@ -753,7 +777,7 @@ extern "C" Variant robust_weight_transfer(Mesh source_mesh, Mesh target_mesh, Di
 
     // Section 3.2 Skinning Weights Inpainting
     Eigen::MatrixXd W_inpainted;
-    bool success = inpaint(vertices_2_eigen, faces_2_eigen, W2_eigen, Matched_eigen, W_inpainted);
+    bool success = inpaint(vertices_2_eigen, faces_2_eigen, W2_eigen, Matched_eigen, W_inpainted, mollify_factor);
     if (verbose) { std::cout << "Inpainting success: " << success << std::endl; }
     if (verbose) { std::cout << "W_inpainted:\n" << W_inpainted << std::endl; }
 
@@ -828,7 +852,7 @@ bool test_robust_weight_transfer() {
 
     // Section 3.2 Skinning Weights Inpainting
     Eigen::MatrixXd W_inpainted;
-    bool success = inpaint(vertices_2, faces_2, W2, Matched, W_inpainted);
+    bool success = inpaint(vertices_2, faces_2, W2, Matched, W_inpainted, DEFAULT_MOLLIFY_FACTOR);
     std::cout << "Inpainting success: " << success << std::endl;
 
     // Optional smoothing
