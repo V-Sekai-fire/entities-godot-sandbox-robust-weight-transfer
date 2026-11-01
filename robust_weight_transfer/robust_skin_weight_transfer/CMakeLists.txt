@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
 project(robust_weight_transfer)
 
-add_subdirectory(cmake)
+set(SANDBOX_API "${CMAKE_SOURCE_DIR}/../../../guest-runtime/vendor/sandbox-api" CACHE PATH "contract-guest-runtime vendor/sandbox-api")
+set(DOWNLOAD_RUNTIME_API OFF)
+set(SANDBOX_RISCV_EXT_V OFF)
+set(DOUBLE_PRECISION ON CACHE BOOL "" FORCE)
+add_subdirectory(${SANDBOX_API}/cmake sandbox_api)
 
 add_definitions(-D_USE_MATH_DEFINES)
 add_definitions(-DIGL_PARALLEL_FOR_FORCE_SERIAL)

@@ -12,12 +12,21 @@
 
 namespace rwt {
 
-// A small ladder: the guest runs these in an emulator.
+// A small ladder. The guest runs these in an emulator under a per-call instruction cap, so it
+// gets fewer trials than the host build, which is where the full ladder runs.
+#if defined(__riscv)
+inline constexpr std::array<witness::Level, 3> PROPERTY_LADDER = { {
+		{ 0, 64, 256, 5 },
+		{ 1, 512, 1024, 10 },
+		{ 2, 4000, 4096, 20 },
+} };
+#else
 inline constexpr std::array<witness::Level, 3> PROPERTY_LADDER = { {
 		{ 0, 64, 256, 25 },
 		{ 1, 512, 1024, 100 },
 		{ 2, 4000, 4096, 300 },
 } };
+#endif
 
 // A jittered n by n grid with random skin weights and a random matched flag per vertex.
 struct GridCase {

@@ -3,12 +3,14 @@
 ![Teaser](https://www.dgp.toronto.edu/~rinat/projects/RobustSkinWeightsTransfer/teaser.jpg)
 Sample code for the Siggraph Asia 2023 Technical Communications paper - [Robust Skin Weights Transfer via Weight Inpainting](https://www.dgp.toronto.edu/~rinat/projects/RobustSkinWeightsTransfer/index.html)
 
-## Compiled for Linux Ubuntu
-
+## Building the guest
+The guest builds with the clang and lld in the `riscv64-sysroot` checkout (pixi) against `guest-runtime`'s sandbox API,
+both beside this repository, and is built at double precision (`.sandbox_variant` reads `SBXV 28000000`):
+```sh
+(cd ../../../riscv64-sysroot && pixi install)
+./compile.sh            # WS=<folder holding riscv64-sysroot and guest-runtime> if they are elsewhere
 ```
-sudo apt install g++-12-riscv64-linux-gnu cmake ninja-build git
-./compile.sh
-```
+The ELF lands next to `robust_weight_transfer/`, named `robust_weight_transfer`; the project loads it as `robust_weight_transfer.elf`.
 
 ## Dependencies
 [Eigen](https://eigen.tuxfamily.org), [libigl](https://libigl.github.io) and
@@ -19,7 +21,7 @@ The tests use [witness-cpp](https://github.com/V-Sekai-fire/repository-witness-c
 - `src/transfer.hpp`: closest point matching, weight inpainting and smoothing.
 - `src/cage.hpp`: the diamond, a convex hull, and the cage built from them.
 - `src/self_test.hpp`, `src/property_test.hpp`: example tests and property tests.
-- `robust_weight_transfer.cpp`: the guest entry points `robust_weight_transfer`, `create_cage` and `run_tests`.
+- `robust_weight_transfer.cpp`: the guest entry points `robust_weight_transfer`, `create_cage`, `run_tests` and `run_property_tests`.
 
 ## Running the tests on the host
 No RISC-V toolchain or engine is needed:
@@ -28,7 +30,7 @@ cmake -S host_test -B build-host -GNinja -DCMAKE_BUILD_TYPE=Release
 cmake --build build-host
 ./build-host/host_test
 ```
-The same tests run in the guest through the `run_tests` call.
+The same tests run in the guest through the `run_tests` and `run_property_tests` calls, each inside the default instruction cap. The guest uses a shorter ladder of trials than the host. The weight arrays the guest returns are column-major: all vertices for bone 0, then bone 1, and so on.
 
 ## Body to garment transfer
 `create_cage` builds a cage around a garment mesh, and `robust_weight_transfer` moves the skin weights of
