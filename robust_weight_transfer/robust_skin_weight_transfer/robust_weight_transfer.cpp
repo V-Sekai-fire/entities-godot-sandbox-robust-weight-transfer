@@ -284,12 +284,24 @@ extern "C" Variant create_cage(Mesh target_mesh, Dictionary arguments, Array out
 	return true;
 }
 
+// The example tests: fast, well inside the per-call instruction cap.
 extern "C" Variant run_tests() {
-	const int failed = run_all_tests();
+	const int failed = run_self_tests();
 	if (failed == 0) {
 		std::cout << "All tests passed!" << std::endl;
 		return Variant(0);
 	}
 	std::cerr << failed << " tests failed." << std::endl;
+	return Variant(1);
+}
+
+// The property tests, in their own call so each stays inside the instruction cap.
+extern "C" Variant run_property_tests() {
+	const int failed = rwt::run_property_tests();
+	if (failed == 0) {
+		std::cout << "All property tests passed!" << std::endl;
+		return Variant(0);
+	}
+	std::cerr << failed << " property tests failed." << std::endl;
 	return Variant(1);
 }

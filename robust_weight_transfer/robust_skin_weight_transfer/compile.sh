@@ -1,11 +1,11 @@
-#!/bin/bash
-
-# ccache is optional, but recommended
-
-# Create build directory
-mkdir -p build
-rm ../robust_skin_weight_transfer.elf
-pushd build
-AR="riscv64-linux-gnu-ar-12" CXX="riscv64-linux-gnu-g++-12" CC="riscv64-linux-gnu-gcc-12" cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain.cmake -DUSE_DOUBLE_PRECISION=ON
-cmake --build .
-popd
+#!/bin/sh
+# Builds robust_weight_transfer.elf with the clang in riscv64-sysroot (pixi) against guest-runtime's sandbox API.
+# Expects the manifest layout, riscv64-sysroot and guest-runtime beside this repository; set WS to the folder that holds them otherwise.
+set -e
+here=$(cd "$(dirname "$0")" && pwd)
+ws=${WS:-$(cd "$here/../../.." && pwd)}
+PATH="$ws/riscv64-sysroot/.pixi/envs/default/bin:$PATH"
+cmake -S "$here" -B "$here/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_DOUBLE_PRECISION=ON \
+  -DSANDBOX_API="$ws/guest-runtime/vendor/sandbox-api" \
+  -DCMAKE_TOOLCHAIN_FILE="$ws/riscv64-sysroot/toolchain.cmake"
+cmake --build "$here/build"
